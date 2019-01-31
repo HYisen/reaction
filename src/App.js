@@ -9,8 +9,8 @@ class App extends Component {
         return (
             <div>
                 <Clock/>
-                <Chart width={400} height={200} showGrid={true} rankCount={5} itemCount={8} statUnit={1}
-                       timestamp={new Date(0)} status={false}/>
+                <Chart width={400} height={200} showGrid={false} rankCount={5} itemCount={8} statUnit={1}
+                       lastRx={new Date(0)} status={false}/>
                 <LoginControl/>
             </div>
         );

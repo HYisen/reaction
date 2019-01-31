@@ -37,6 +37,7 @@ export class LoginControl extends React.Component {
         } else {
             button = <LogoutButton onclick={this.handleLogout}/>;
         }
+        // console.log('render login');
         return (
             <div>
                 {button}

@@ -5,6 +5,7 @@ import React from "react";
 export function LabeledSlider(props) {
     const name = props.name;
     const composedId = `${name}Slider`;
+    // console.log('render LS');
     return (
         <div className={'slider'}>
             <Typography id={composedId} variant='subtitle1'>{name}</Typography>

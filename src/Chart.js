@@ -36,13 +36,13 @@ export class Chart extends React.Component {
             rankCount: props.rankCount,
             itemCount: props.itemCount,
             statUnit: props.statUnit,
-            timestamp: props.timestamp,
+            lastRx: props.lastRx,
             status: props.status
         };
     }
 
     update = () => {
-        console.log('update');
+        // console.log('update');
         const url = 'http://ol.tinylink.cn/onelink/project_module/project_control.php?type=rawData&dataSource=2206';
         fetch(url)
             .then(response => response.json())
@@ -53,66 +53,65 @@ export class Chart extends React.Component {
                 const lumi = parseInt(cnt['value']);
                 const time = new Date(cnt['time']);
 
-                console.log(lumi);
-                console.log(time);
-                if (time.valueOf() > this.state.timestamp.valueOf()) {
-                    this.setState({timestamp: time});
+                // console.log(lumi);
+                // console.log(time);
+                if (time.valueOf() > this.state.lastRx.valueOf()) {
                     const status = lumi > lumiThreshold;
-                    if (status !== this.state.status) {
-                        this.setState({status: status});
-                        this.manage(status, time);
-                    }
+                    // this.manage(status, time);
+                    this.setState({lastRx: time, status: status});
                 }
             });
     };
 
-    //Only changed status should be passed to there.
     manage = (newStatus, newTime) => {
         const minute = newTime.getMinutes();
         const second = newTime.getSeconds();
+        let elapse = (newTime - this.oldTime);
 
-        if (newTime.getHours() !== this.oldTime.getHours()) {
-            this.oldTime = newTime;
+        // console.log(`elapsed ${elapse} ms`);
+
+        const shouldUpdateMinutely = minute !== this.oldTime.getMinutes();
+        const shouldUpdateHourly = newTime.getHours() !== this.oldTime.getHours();
+        this.oldTime = newTime;
+
+        if (shouldUpdateHourly) {
+            console.log(`hourly update at ${newTime.toString()}`);
             this.statData = new Array(60);
             this.statData.fill(new Array(60));
         }
-        if (minute !== this.oldTime.getMinutes()) {
-            console.log(`${minute}: on for ${this.onCount} secs , switch ${this.actionCount} times`);
-            for (let k = 0; k < this.statData[minute].length; k++) {
-                let one = this.statData[minute][k];
-                if (one !== null) {
-                    console.log(`${this.statData[minute][k] ? 1 : 0} : ${k}`);
-                }
-            }
-            this.actionCount = 0;
+        if (shouldUpdateMinutely) {
+            console.log(`minutely update at ${newTime.toString()}`);
+            console.log(`on for ${this.onMsCount} ms (${this.usage[0]}) switch ${this.count[0]} times`);
+
+            this.usage.unshift(0.0);
+            this.count.unshift(0);
+
+            this.onMsCount = 0;
+            elapse = 0;
         }
 
-        this.statData[minute][second] = newStatus;
-        this.actionCount += 1;
-        let previous = null;
-        let onCount = 0;
-        for (let k = 0; k < this.statData[minute][second]; k++) {
-            let one = this.statData[minute][k];
-            if (one !== null) {
-                if (previous === null) {
-                    if (one) {
-                        onCount += k;
-                    }
-                } else if (previous === true) {
-                    onCount += 1;
-                }
-                previous = one;
+        if (this.state.status === true) {
+            this.onMsCount += elapse;
+            // console.log(`${this.onMsCount / (second * 1000)}=${this.onMsCount}/${second}000`);
+            if (second >= 1) {
+                this.usage[0] = this.onMsCount / (second * 1000);
             }
         }
-        this.onCount = onCount;
-        console.log(`${onCount} of ${second}`);
+
+        if (newStatus !== this.loggedStatus) {
+            this.loggedStatus = newStatus;
+            this.count[0] += 1;
+        }
     };
 
     componentDidMount() {
         this.timerID0 = setInterval(() => this.update(), 2000);
-        // this.timerID1 = setInterval(() => this.manageData(), 1000 * 60);
+        this.timerID1 = setInterval(() => this.manage(this.state.status, new Date()), 2000);
 
         this.oldTime = new Date(0);
+
+        this.usage = [0.0];
+        this.count = [0];
 
         let canvas = document.getElementById("canvas");
         this.ctx = canvas.getContext('2d');
@@ -121,7 +120,7 @@ export class Chart extends React.Component {
 
     componentWillUnmount() {
         clearInterval(this.timerID0);
-        // clearInterval(this.timerID1);
+        clearInterval(this.timerID1);
     }
 
     paint = (ctx) => {
@@ -186,15 +185,18 @@ export class Chart extends React.Component {
 
         //draw grid
         if (this.state.showGrid) {
-            console.log("grid");
             grid();
             grid(50);
         }
 
         ctx.fillStyle = 'red';
 
-        let usage = [0.2, 0.1, 0.5, 0.6, 0.8, 0.9, 1.0, 0.4];
-        let count = [10, 6, 5, 20, 4, 2, 0, 14];
+        // console.log(this.usage);
+        // console.log(this.count);
+        let usage = this.usage;
+        // let usage = [0.2, 0.1, 0.5, 0.6, 0.8, 0.9, 1.0, 0.4];
+        let count = this.count;
+        // let count = [10, 6, 5, 20, 4, 2, 0, 14];
 
         const rankCount = this.state.rankCount;
         const rankHeight = (south - north) / rankCount;
@@ -229,11 +231,13 @@ export class Chart extends React.Component {
         const itemWidth = ((east - west) - sideMargin * 2) / itemCount;
         const omegaLeft = east - sideMargin - itemWidth;
         const ratioHeight = (south - north);
+        //TODO: cache the result of calTime
         const calTime = k => {
+            const lastTime = new Date(this.oldTime - 60000 * k).toTimeString();
             if (itemCount > 10) {
-                return (45 - k * 1);
+                return lastTime.substr(3, 2);
             } else {
-                return '12' + (45 - k * 1);
+                return lastTime.substr(0, 2) + lastTime.substr(3, 2);
             }
         };
         ctx.lineWidth = 2;
@@ -276,14 +280,13 @@ export class Chart extends React.Component {
 
 
     render() {
-        console.log(`render with grid ${this.state.showGrid}`);
+        // console.log(`render with grid ${this.state.showGrid}`);
         if (this.ctx) {
             this.paint(this.ctx);
         }
-        console.log(`count=${this.state.rankCount}`);
         return (
             <div>
-                <p>last_rx = {this.state.timestamp.toISOString()} &nbsp;&nbsp;&nbsp;&nbsp;
+                <p>last_rx = {this.state.lastRx.toISOString()} &nbsp;&nbsp;&nbsp;&nbsp;
                     status = {this.state.status ? 'ON' : 'OFF'}</p>
                 <canvas id="canvas" width={this.state.width} height={this.state.height}>
                     <p>This is a Chart should have displayed through &lt;canvas&gt;.</p>

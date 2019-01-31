@@ -36,13 +36,20 @@
             margin-left: 1px;
         }
 
-        div.config {
-            margin: auto;
-            width: 50%;
+        div.slider{
+            width: 60%;
+            margin-left: 20%;
+            padding: 10px;
         }
 
-        div.config > * {
-            margin: 10px;
+        div.config{
+            width: 60%;
+            margin-left: 20%;
+            padding: 10px;
+        }
+
+        .switch{
+            float: right;
         }
 
 
@@ -69,15 +76,92 @@
                 showGrid: props.showGrid,
                 rankCount: props.rankCount,
                 itemCount: props.itemCount,
-                statUnit: props.statUnit
+                statUnit: props.statUnit,
+                lastRx: props.lastRx,
+                status: props.status
             };
         }
 
+        update = () => {
+            // console.log('update');
+            const url = 'http://ol.tinylink.cn/onelink/project_module/project_control.php?type=rawData&dataSource=2206';
+            fetch(url)
+                .then(response => response.json())
+                .then(json => json['data'][2206])
+                .then(cnt => {
+                    const lumiThreshold = 100;
+
+                    const lumi = parseInt(cnt['value']);
+                    const time = new Date(cnt['time']);
+
+                    // console.log(lumi);
+                    // console.log(time);
+                    if (time.valueOf() > this.state.lastRx.valueOf()) {
+                        const status = lumi > lumiThreshold;
+                        // this.manage(status, time);
+                        this.setState({lastRx: time, status: status});
+                    }
+                });
+        };
+
+        manage = (newStatus, newTime) => {
+            const minute = newTime.getMinutes();
+            const second = newTime.getSeconds();
+            let elapse = (newTime - this.oldTime);
+
+            // console.log(`elapsed ${elapse} ms`);
+
+            const shouldUpdateMinutely = minute !== this.oldTime.getMinutes();
+            const shouldUpdateHourly = newTime.getHours() !== this.oldTime.getHours();
+            this.oldTime = newTime;
+
+            if (shouldUpdateHourly) {
+                console.log(`hourly update at ${newTime.toString()}`);
+                this.statData = new Array(60);
+                this.statData.fill(new Array(60));
+            }
+            if (shouldUpdateMinutely) {
+                console.log(`minutely update at ${newTime.toString()}`);
+                console.log(`on for ${this.onMsCount} ms (${this.usage[0]}) switch ${this.count[0]} times`);
+
+                this.usage.unshift(0.0);
+                this.count.unshift(0);
+
+                this.onMsCount = 0;
+                elapse = 0;
+            }
+
+            if (this.state.status === true) {
+                this.onMsCount += elapse;
+                // console.log(`${this.onMsCount / (second * 1000)}=${this.onMsCount}/${second}000`);
+                if (second >= 1) {
+                    this.usage[0] = this.onMsCount / (second * 1000);
+                }
+            }
+
+            if (newStatus !== this.loggedStatus) {
+                this.loggedStatus = newStatus;
+                this.count[0] += 1;
+            }
+        };
+
         componentDidMount() {
+            this.timerID0 = setInterval(() => this.update(), 2000);
+            this.timerID1 = setInterval(() => this.manage(this.state.status, new Date()), 2000);
+
+            this.oldTime = new Date(0);
+
+            this.usage = [0.0];
+            this.count = [0];
+
             let canvas = document.getElementById("canvas");
             this.ctx = canvas.getContext('2d');
-
             this.paint(this.ctx);
+        }
+
+        componentWillUnmount() {
+            clearInterval(this.timerID0);
+            clearInterval(this.timerID1);
         }
 
         paint = (ctx) => {
@@ -142,15 +226,18 @@
 
             //draw grid
             if (this.state.showGrid) {
-                console.log("grid");
                 grid();
                 grid(50);
             }
 
             ctx.fillStyle = 'red';
 
-            let usage = [0.2, 0.1, 0.5, 0.6, 0.8, 0.9, 1.0, 0.4];
-            let count = [10, 6, 5, 20, 4, 2, 0, 14];
+            // console.log(this.usage);
+            // console.log(this.count);
+            let usage = this.usage;
+            // let usage = [0.2, 0.1, 0.5, 0.6, 0.8, 0.9, 1.0, 0.4];
+            let count = this.count;
+            // let count = [10, 6, 5, 20, 4, 2, 0, 14];
 
             const rankCount = this.state.rankCount;
             const rankHeight = (south - north) / rankCount;
@@ -164,7 +251,7 @@
             while (rankCount * metric / 2 > maxValue) {
                 metric /= 2;
             }
-            console.log(`metric=${metric}`);
+            // console.log(`metric=${metric}`);
 
             const ratioTick = 100 / rankCount;
             const valueTick = metric;
@@ -185,11 +272,13 @@
             const itemWidth = ((east - west) - sideMargin * 2) / itemCount;
             const omegaLeft = east - sideMargin - itemWidth;
             const ratioHeight = (south - north);
+            //TODO: cache the result of calTime
             const calTime = k => {
+                const lastTime = new Date(this.oldTime - 60000 * k).toTimeString();
                 if (itemCount > 10) {
-                    return (45 - k * 1);
+                    return lastTime.substr(3, 2);
                 } else {
-                    return '12' + (45 - k * 1);
+                    return lastTime.substr(0, 2) + lastTime.substr(3, 2);
                 }
             };
             ctx.lineWidth = 2;
@@ -230,18 +319,21 @@
             // line(west, south, east, south);
         };
 
+
         render() {
-            console.log(`render with grid ${this.state.showGrid}`);
+            // console.log(`render with grid ${this.state.showGrid}`);
             if (this.ctx) {
                 this.paint(this.ctx);
             }
-            console.log(`count=${this.state.rankCount}`);
             return (
                 <div>
+                    <p>last_rx = {this.state.lastRx.toISOString()} &nbsp;&nbsp;&nbsp;&nbsp;
+                        status = {this.state.status ? 'ON' : 'OFF'}</p>
                     <canvas id="canvas" width={this.state.width} height={this.state.height}>
                         <p>This is a Chart should have displayed through &lt;canvas&gt;.</p>
                     </canvas>
                     <br/>
+
                     <div className={'config'}>
                         <FormControl>
                             <InputLabel htmlFor="statUnitSelect">statUnit</InputLabel>
@@ -260,7 +352,22 @@
                                 <MenuItem value={5}>5 min</MenuItem>
                             </Select>
                         </FormControl>
-                        <br/>
+                        <FormControlLabel className={'switch'}
+                                          control={
+                                              <Switch
+                                                  checked={this.state.showGrid}
+                                                  onChange={(event, checked) => {
+                                                      console.log(`change showGrid to ${checked}`);
+                                                      this.setState({showGrid: checked})
+                                                  }}
+                                                  value="showGrid"
+                                                  color="primary"
+                                              />
+                                          }
+                                          label="showGrid"
+                        />
+                    </div>
+                    <div className={'slider'}>
                         <FormControl>
                             <InputLabel htmlFor="rankCountSelect">rankCount</InputLabel>
                             <Select
@@ -280,7 +387,7 @@
                                 <MenuItem value={10}>10 ranks</MenuItem>
                             </Select>
                         </FormControl>
-                        <br/>
+                        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
                         <FormControl>
                             <InputLabel htmlFor="itemCountSelect">itemCount</InputLabel>
                             <Select
@@ -302,39 +409,14 @@
                                 <MenuItem value={20}>20 items</MenuItem>
                             </Select>
                         </FormControl>
-                        <br/>
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={this.state.showGrid}
-                                    onChange={(event, checked) => {
-                                        console.log(`change showGrid to ${checked}`);
-                                        this.setState({showGrid: checked})
-                                    }}
-                                    value="showGrid"
-                                    color="primary"
-                                />
-                            }
-                            label="showGrid"
-                        />
                     </div>
-                    {/*<LabeledSlider name={'rankCount'} value={this.state.rankCount} min={1} max={10}*/}
-                    {/*handler={(event, value) => {*/}
-                    {/*console.log(`change rankCount to ${value}`);*/}
-                    {/*this.setState({rankCount: value});*/}
-                    {/*}}/>*/}
-                    {/*<LabeledSlider name={'itemCount'} value={this.state.itemCount} min={1} max={20}*/}
-                    {/*handler={(event, value) => {*/}
-                    {/*console.log(`change itemCount to ${value}`);*/}
-                    {/*this.setState({itemCount: value});*/}
-                    {/*}}/>*/}
                 </div>
             );
         }
     }
 
-    ReactDOM.render(<Chart width={400} height={200} showGrid={true} rankCount={5} itemCount={8}
-                           statUnit={1}/>, document.getElementById('root'));
+    ReactDOM.render(<Chart width={400} height={200} showGrid={false} rankCount={5} itemCount={8}
+                           statUnit={1} lastRx={new Date(0)} status={false}/>, document.getElementById('root'));
 
 </script>
 </body>
