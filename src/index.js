@@ -24,7 +24,10 @@ import * as serviceWorker from './serviceWorker';
 import App from "./App";
 
 
-ReactDOM.render(<App />, document.getElementById('root'));
+ReactDOM.render(
+    <App width={400} height={200} showGrid={true} rankCount={5} itemCount={8} statUnit={1}
+         timestamp={new Date(0)} status={false}/>
+                     , document.getElementById('root'));
 
 
 // If you want your app to work offline and load faster, you can change
