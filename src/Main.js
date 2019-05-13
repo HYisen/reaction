@@ -132,7 +132,7 @@ class Main extends React.Component {
         message: '',
         info: [],
         count: 0,
-        status: false,
+        linked: false,
         content: [],
         item: '.',
         loaded: false,
@@ -217,7 +217,7 @@ class Main extends React.Component {
     };
 
     onLinkButtonAction = () => {
-        if (!this.state.status) {
+        if (!this.state.linked) {
             this.cookie.set('host', this.state.host);
             this.cookie.set('port', this.state.port);
 
@@ -228,8 +228,21 @@ class Main extends React.Component {
         }
     };
 
+    reload = () => {
+        let temp = this.socket.onmessage;
+        this.socket.onmessage = (event) => {
+            if (event.data === 'reloaded') {
+                this.socket.onmessage = temp;
+                this.setState({loaded: false});
+            } else {
+                throw new Error("unexpected reload return:" + event.data);
+            }
+        };
+        this.socket.send('reload');
+    };
+
     relink = () => {
-        if (!this.state.status) {
+        if (!this.state.linked) {
             setTimeout(null, 1000);
             let oldSocket = this.socket;
             if (oldSocket == null) {
@@ -238,11 +251,11 @@ class Main extends React.Component {
                 oldSocket = {};//dummy data container
                 oldSocket.onopen = () => {
                     this.showMessage('info', 'opened');
-                    this.setState({status: true});
+                    this.setState({linked: true});
                 };
                 oldSocket.onclose = () => {
                     this.showMessage('info', 'closed');
-                    this.setState({status: false});
+                    this.setState({linked: false});
                 };
                 oldSocket.onerror = (event) => {
                     this.showMessage('info', 'error=' + event);
@@ -308,7 +321,7 @@ class Main extends React.Component {
             </Grid>
         );
         let button;
-        if (!this.state.status) {
+        if (!this.state.linked) {
             button = <MyButton className={classes.button} content={'OFF'} onclick={this.onLinkButtonAction}
                                color={"secondary"}/>;
         } else {
@@ -316,10 +329,30 @@ class Main extends React.Component {
                                color={"primary"}/>;
         }
 
+        let pos = -1;
+        if (this.state.tab === 1) {
+            pos = this.state.item.indexOf('.');
+        }
+
+        let fab = '';
+        if (!this.state.linked) {
+            fab =
+                <Fab color="secondary" aria-label="ReLink"
+                     className={classes.fab} onClick={this.relink}>
+                    <Refresh/>
+                </Fab>;
+        } else if (this.state.loaded && this.state.tab === 1 && pos === 0) {
+            //loaded reader shelf
+            fab =
+                <Fab color="primary" aria-label="ReLoad"
+                     className={classes.fab} onClick={this.reload}>
+                    <Refresh/>
+                </Fab>;
+        }
+
         let reader = '';
         if (this.state.tab === 1) {
-            const pos = this.state.item.indexOf('.');
-            switch (this.state.item.indexOf('.')) {
+            switch (pos) {
                 case 0:
                     //shelf
                     if (this.state.loaded) {
@@ -374,7 +407,7 @@ class Main extends React.Component {
                             }
                             {books}
                         </Grid>;
-                    } else if (this.state.status === true) {
+                    } else if (this.state.linked === true) {
                         console.log("load shelf");
                         this.manageMessage('SHELF');
                     }
@@ -417,7 +450,7 @@ class Main extends React.Component {
                             </Grid>
                             {chapters}
                         </Grid>;
-                    } else if (this.state.status === true) {
+                    } else if (this.state.linked === true) {
                         console.log(`load table of contents of ${this.state.item}`);
                         this.manageMessage('BOOK');
                     }
@@ -468,7 +501,7 @@ class Main extends React.Component {
                                 </Card>
                             </Grid>}
                         </Grid>;
-                    } else if (this.state.status === true) {
+                    } else if (this.state.linked === true) {
                         console.log(`load chapter ${this.state.item}`);
                         this.manageMessage('CHAPTER');
                     }
@@ -545,11 +578,7 @@ class Main extends React.Component {
                 {tab === 1 &&
                 <TabContainer>
                     {reader}
-                    {!this.state.status &&
-                    <Fab color="secondary" aria-label="ReLink"
-                         className={classes.fab} onClick={this.relink}>
-                        <Refresh/>
-                    </Fab>}
+                    {fab}
                 </TabContainer>}
             </div>
         );
