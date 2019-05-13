@@ -512,7 +512,7 @@ class Main extends React.Component {
         return (
             <div className={classes.root}>
                 <AppBar position="static">
-                    <Tabs value={tab} onChange={this.handleChange('tab')}>
+                    <Tabs value={tab} variant="fullWidth" onChange={this.handleChange('tab')}>
                         <Tab label="Config"/>
                         <Tab label="Reader"/>
                     </Tabs>
