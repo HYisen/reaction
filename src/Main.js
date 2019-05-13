@@ -121,11 +121,14 @@ function MyButton(props) {
     );
 }
 
+const DEFAULT_HOST = 'localhost';
+const DEFAULT_PORT = '443';
+
 class Main extends React.Component {
     state = {
         tab: 0,
-        host: 'localhost',
-        port: '443',
+        host: DEFAULT_HOST,
+        port: DEFAULT_PORT,
         message: '',
         info: [],
         count: 0,
