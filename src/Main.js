@@ -18,6 +18,8 @@ import CardActionArea from '@material-ui/core/CardActionArea';
 import CardContent from '@material-ui/core/CardContent';
 
 import Cookies from 'universal-cookie'
+import Fab from '@material-ui/core/Fab';
+import {Refresh} from '@material-ui/icons';
 
 
 function TabContainer(props) {
@@ -95,12 +97,20 @@ const styles = theme => ({
     card: {
         // maxWidth: 400,
     },
-    text:{
-        'text-indent':'2em',
+    text: {
+        'text-indent': '2em',
     },
-    info:{
-        'text-align':'center',
-    }
+    info: {
+        'text-align': 'center',
+    },
+    fab: {
+        margin: theme.spacing.unit,
+        top: theme.spacing.unit,
+        right: theme.spacing.unit,
+        bottom: 'auto',
+        left: 'auto',
+        position: 'fixed',
+    },
 });
 
 function MyButton(props) {
@@ -174,7 +184,14 @@ class Main extends React.Component {
         this.socket.send(`${cmd} ${this.state.item}`);
         let temp = this.socket.onmessage;
         this.socket.onmessage = (event) => {
-            let input = JSON.parse(event.data);
+            let input = null;
+            try {
+                input = JSON.parse(event.data);//keep calm.
+            } catch (e) {
+                console.log("failed to parse msg:\n" + event.data);
+                return;
+            }
+
             if (input.type === expectType) {
                 switch (expectType) {
                     case "BOOK":
@@ -198,28 +215,50 @@ class Main extends React.Component {
 
     onLinkButtonAction = () => {
         if (!this.state.status) {
-            const addr = `ws://${this.state.host}:${this.state.port}/ws`;
-            console.log(`link to ${addr}`);
             this.cookie.set('host', this.state.host);
             this.cookie.set('port', this.state.port);
-            this.socket = new WebSocket(addr);
-            this.socket.onopen = () => {
-                this.showMessage('info', 'opened');
-                this.setState({status: true});
-            };
-            this.socket.onclose = () => {
-                this.showMessage('info', 'closed');
-                this.setState({status: false});
-            };
-            this.socket.onerror = (event) => {
-                this.showMessage('info', 'error=' + event);
-            };
-            this.socket.onmessage = (event) => {
-                this.showMessage('server', event.data);
-            };
+
+            this.relink();
         } else {
             console.log(`close`);
             this.socket.close();
+        }
+    };
+
+    relink = () => {
+        if (!this.state.status) {
+            setTimeout(null, 1000);
+            let oldSocket = this.socket;
+            if (oldSocket == null) {
+                console.log("link");
+
+                oldSocket = {};//dummy data container
+                oldSocket.onopen = () => {
+                    this.showMessage('info', 'opened');
+                    this.setState({status: true});
+                };
+                oldSocket.onclose = () => {
+                    this.showMessage('info', 'closed');
+                    this.setState({status: false});
+                };
+                oldSocket.onerror = (event) => {
+                    this.showMessage('info', 'error=' + event);
+                };
+                oldSocket.onmessage = (event) => {
+                    this.showMessage('server', event.data);
+                };
+            } else {
+                console.log("relink");
+            }
+
+            const addr = `ws://${this.state.host}:${this.state.port}/ws`;
+            console.log(`link to ${addr}`);
+
+            this.socket = new WebSocket(addr);
+            this.socket.onopen = oldSocket.onopen;
+            this.socket.onclose = oldSocket.onclose;
+            this.socket.onerror = oldSocket.onerror;
+            this.socket.onmessage = oldSocket.onmessage;
         }
     };
 
@@ -503,6 +542,11 @@ class Main extends React.Component {
                 {tab === 1 &&
                 <TabContainer>
                     {reader}
+                    {!this.state.status &&
+                    <Fab color="secondary" aria-label="ReLink"
+                         className={classes.fab} onClick={this.relink}>
+                        <Refresh/>
+                    </Fab>}
                 </TabContainer>}
             </div>
         );
