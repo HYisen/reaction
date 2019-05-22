@@ -17,7 +17,6 @@ import Card from '@material-ui/core/Card';
 import CardActionArea from '@material-ui/core/CardActionArea';
 import CardContent from '@material-ui/core/CardContent';
 
-import Cookies from 'universal-cookie'
 import Fab from '@material-ui/core/Fab';
 import {Refresh} from '@material-ui/icons';
 
@@ -69,8 +68,8 @@ class Shiori {
 
     map = {};//bookIndex->chapterIndex
 
-    load = (self) => {
-        const info = self.cookie.get('shiori');
+    load = () => {
+        const info = JSON.parse(window.localStorage.getItem('shiori'));
         if (info !== undefined) {
             Object.assign(this, info);
             console.log(`reconstruct shiori to:`);
@@ -78,8 +77,8 @@ class Shiori {
         }
     };
 
-    save = (self) => {
-        self.cookie.set('shiori', JSON.stringify(this));
+    save = () => {
+        window.localStorage.setItem('shiori', JSON.stringify(this));
     };
 }
 
@@ -163,12 +162,10 @@ class Main extends React.Component {
     };
 
     componentDidMount() {
-        this.cookie = new Cookies();
         this.bookmark = new Shiori();
-        this.bookmark.load(this);
-
-        let oldHost = this.cookie.get('host');
-        let oldPort = this.cookie.get('port');
+        this.bookmark.load();
+        let oldHost = window.localStorage.getItem('host');
+        let oldPort = window.localStorage.getItem('port');
         this.setState({
             host: oldHost === undefined ? this.state.host : oldHost,
             port: oldPort === undefined ? this.state.port : Number(oldPort)
@@ -222,7 +219,7 @@ class Main extends React.Component {
                         this.bookmark.chapterIndex = Number(this.state.item.substr(
                             this.state.item.indexOf('.') + 1));
                         this.bookmark.map[this.bookmark.bookIndex] = this.bookmark.chapterIndex;
-                        this.bookmark.save(this);
+                        this.bookmark.save();
                         break;
                     default:
                 }
@@ -234,8 +231,8 @@ class Main extends React.Component {
 
     onLinkButtonAction = () => {
         if (!this.state.linked) {
-            this.cookie.set('host', this.state.host);
-            this.cookie.set('port', this.state.port);
+            window.localStorage.setItem('host', this.state.host);
+            window.localStorage.setItem('port', this.state.port);
 
             this.relink();
         } else {
