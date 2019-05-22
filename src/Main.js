@@ -66,6 +66,8 @@ class Shiori {
     bookIndex;
     chapterIndex;
     maxIndex;
+
+    map = {};//bookIndex->chapterIndex
 }
 
 const styles = theme => ({
@@ -206,6 +208,7 @@ class Main extends React.Component {
                         this.bookmark.chapterName = input.name;
                         this.bookmark.chapterIndex = Number(this.state.item.substr(
                             this.state.item.indexOf('.') + 1));
+                        this.bookmark.map[this.bookmark.bookIndex] = this.bookmark.chapterIndex;
                         this.cookie.set('shiori', JSON.stringify(this.bookmark));
                         break;
                     default:
@@ -380,7 +383,11 @@ class Main extends React.Component {
                         let remember = info !== undefined;
                         if (remember) {
                             this.bookmark = info;
-                            console.log(`reconstruct shiori to ${this.bookmark}`);
+                            if (this.bookmark.map === undefined) {
+                                this.bookmark.map = {};
+                            }
+                            console.log(`reconstruct shiori to:`);
+                            console.log(this.bookmark);
                         }
                         reader = <Grid
                             container
@@ -429,6 +436,7 @@ class Main extends React.Component {
                                     </CardActionArea>
                                 </Card>
                             </Grid>).reverse();
+                        const chapterIndex = this.bookmark.map[this.bookmark.bookIndex];
                         reader = <Grid
                             container
                             direction="column"
@@ -448,6 +456,23 @@ class Main extends React.Component {
                                     </CardActionArea>
                                 </Card>
                             </Grid>
+                            {chapterIndex &&
+                            <Grid item key={++cnt}>
+                                <Card className={classes.card}>
+                                    <CardActionArea onClick={(() => () => {
+                                        console.log(`click shiori of ${this.bookmark}`);
+                                        this.setState({
+                                            item: `${this.bookmark.bookIndex}.${chapterIndex}`,
+                                            loaded: false
+                                        });
+                                    })(cnt)}>
+                                        <CardContent>
+                                            {`last read -> ${this.state.content[chapterIndex]}`}
+                                        </CardContent>
+                                    </CardActionArea>
+                                </Card>
+                            </Grid>
+                            }
                             {chapters}
                         </Grid>;
                     } else if (this.state.linked === true) {
