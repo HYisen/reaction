@@ -68,6 +68,19 @@ class Shiori {
     maxIndex;
 
     map = {};//bookIndex->chapterIndex
+
+    load = (self) => {
+        const info = self.cookie.get('shiori');
+        if (info !== undefined) {
+            Object.assign(this, info);
+            console.log(`reconstruct shiori to:`);
+            console.log(this);
+        }
+    };
+
+    save = (self) => {
+        self.cookie.set('shiori', JSON.stringify(this));
+    };
 }
 
 const styles = theme => ({
@@ -150,8 +163,9 @@ class Main extends React.Component {
     };
 
     componentDidMount() {
-        this.bookmark = new Shiori();
         this.cookie = new Cookies();
+        this.bookmark = new Shiori();
+        this.bookmark.load(this);
 
         let oldHost = this.cookie.get('host');
         let oldPort = this.cookie.get('port');
@@ -159,7 +173,6 @@ class Main extends React.Component {
             host: oldHost === undefined ? this.state.host : oldHost,
             port: oldPort === undefined ? this.state.port : Number(oldPort)
         });
-        console.log(this.cookie.get('shiori'));
     }
 
     componentWillUnmount() {
@@ -209,7 +222,7 @@ class Main extends React.Component {
                         this.bookmark.chapterIndex = Number(this.state.item.substr(
                             this.state.item.indexOf('.') + 1));
                         this.bookmark.map[this.bookmark.bookIndex] = this.bookmark.chapterIndex;
-                        this.cookie.set('shiori', JSON.stringify(this.bookmark));
+                        this.bookmark.save(this);
                         break;
                     default:
                 }
@@ -379,16 +392,11 @@ class Main extends React.Component {
                                     </CardActionArea>
                                 </Card>
                             </Grid>);
-                        let info = this.cookie.get('shiori');
-                        let remember = info !== undefined;
-                        if (remember) {
-                            this.bookmark = info;
-                            if (this.bookmark.map === undefined) {
-                                this.bookmark.map = {};
-                            }
-                            console.log(`reconstruct shiori to:`);
-                            console.log(this.bookmark);
-                        }
+
+
+                        // drop the possible modification on bookmark by read of book's table of content
+                        this.bookmark.load(this);
+
                         reader = <Grid
                             container
                             direction="column"
@@ -396,7 +404,7 @@ class Main extends React.Component {
                             alignItems="stretch"
                             spacing={8}
                         >
-                            {remember &&
+                            {this.bookmark.bookName !== undefined &&
                             <Grid item key={++cnt}>
                                 <Card className={classes.card}>
                                     <CardActionArea onClick={() => {
